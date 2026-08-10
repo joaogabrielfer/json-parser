@@ -1,8 +1,9 @@
 module Main (main) where
 
 import Text.Parsec
+import Text.Printf (printf)
 import Text.Parsec.String (Parser)
-import Text.Read (readMaybe)
+import System.Environment (getArgs, getProgName)
 
 whitespace :: Parser ()
 whitespace = skipMany (oneOf " \t\r\n")
@@ -100,8 +101,8 @@ member = do
 json :: Parser JsonValue
 json = whitespace *> jsonValue <* eof
 
-parseInput :: String -> Either ParseError JsonValue
-parseInput s = parse json "<input>" s
+-- parseInput :: String -> Either ParseError JsonValue
+-- parseInput s = parse json "<input>" s
 
 parseFile :: FilePath -> IO (Either ParseError JsonValue)
 parseFile path = do
@@ -110,4 +111,10 @@ parseFile path = do
 
 main :: IO ()
 main = do
-  print $ parseInput "null"
+    progName <- getProgName
+    args <- getArgs
+    case args of
+        [path] -> do
+            parsedJson <- parseFile path
+            print $ parsedJson
+        _ -> printf "ERROR: No file path was provided.\nUSAGE:\n    %s <path>\n" progName
