@@ -1,0 +1,39 @@
+# Cabal build directories
+dist-newstyle/
+dist/
+cabal-dev/
+
+# Cabal sandboxes
+cabal.sandbox.config
+cabal.sandbox/
+
+# Local project config (overrides)
+cabal.project.local
+cabal.project.local~
+
+# Compiled Object files, interfaces, and Haskell executables
+*.o
+*.hi
+*.hie
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+
+# GHCi/HPC files
+.hpc
+.hsenv
+.ghc.environment.*
+
+# Profiling and eventlogs
+*.prof
+*.hp
+*.eventlog
+
+# Documentation and temporary files
+.HTF/
+*.aux
+*.hp
+
+# Stack build directory (if you ever use stack)
+/.stack-work/
