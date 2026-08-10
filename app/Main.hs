@@ -4,9 +4,13 @@ import Text.Parsec
 import Text.Printf (printf)
 import Text.Parsec.String (Parser)
 import System.Environment (getArgs, getProgName)
+import GHC.IO.Handle (hFlush)
+import System.IO (stdout)
+import Data.List.Split
+import Control.Monad (foldM)
 
 whitespace :: Parser ()
-whitespace = skipMany (oneOf " \t\r\n")
+whitespace = skipMany (Text.Parsec.oneOf " \t\r\n")
 
 lexeme :: Parser a -> Parser a
 lexeme p = p <* whitespace
@@ -52,7 +56,7 @@ integerPart :: Parser String
 integerPart =
         string "0"
     <|> do
-        first <- oneOf ['1'..'9']
+        first <- Text.Parsec.oneOf ['1'..'9']
         rest <- many digit
         return (first : rest)
 
@@ -64,8 +68,8 @@ fractionPart = do
 
 exponentPart :: Parser String
 exponentPart = do
-    e <- oneOf "eE"
-    sign <- option "" ((:[]) <$> oneOf "+-")
+    e <- Text.Parsec.oneOf "eE"
+    sign <- option "" ((:[]) <$> Text.Parsec.oneOf "+-")
     digits <- many1 digit
     return (e : sign ++ digits)
 
@@ -80,14 +84,14 @@ jsonNumber = do
 jsonArray :: Parser JsonValue
 jsonArray = do
     _ <- symbol "["
-    values <- jsonValue `sepBy` symbol ","
+    values <- jsonValue `Text.Parsec.sepBy` symbol ","
     _ <- symbol "]"
     return $ JsonArray values
 
 jsonObject :: Parser JsonValue
 jsonObject = do
     _ <- symbol "{"
-    m <- member `sepBy` symbol ","
+    m <- member `Text.Parsec.sepBy` symbol ","
     _ <- symbol "}"
     return $ JsonObject m
 
@@ -109,12 +113,33 @@ parseFile path = do
     content <- readFile path
     pure $ parse json path content
 
+getField :: JsonValue -> String ->Maybe JsonValue
+getField (JsonObject fields) key =
+    lookup key fields
+getField _ _ =
+    Nothing
+
+getNestedField :: JsonValue -> String -> Maybe JsonValue
+getNestedField (JsonObject fields) key = foldM getField (JsonObject fields) (splitOn "." key)
+getNestedField _ _ = Nothing
+
+repl :: FilePath -> IO ()
+repl path = do
+    parsedJson <- parseFile path
+    putStr "> "
+    hFlush stdout
+    input <- getLine
+    case parsedJson of
+        Right value -> do
+            print $ getNestedField value input
+            repl path
+        Left err -> print err
+
+
 main :: IO ()
 main = do
     progName <- getProgName
     args <- getArgs
     case args of
-        [path] -> do
-            parsedJson <- parseFile path
-            print $ parsedJson
+        [path] -> repl path
         _ -> printf "ERROR: No file path was provided.\nUSAGE:\n    %s <path>\n" progName
