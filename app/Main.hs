@@ -105,8 +105,17 @@ member = do
 json :: Parser JsonValue
 json = whitespace *> jsonValue <* eof
 
--- parseInput :: String -> Either ParseError JsonValue
--- parseInput s = parse json "<input>" s
+serialize :: Int -> JsonValue -> String
+serialize ident value = case value of
+    JsonNull -> "null"
+    JsonBool b -> if b then "true" else "false"
+    JsonString s -> "\"" ++ s ++ "\""
+    JsonNumber d -> show d
+    JsonArray a -> "[\n" ++ unlines [prefix ++ serialize (ident + 1) v ++ ","| v <- a] ++ prev_prefix ++ "]"
+    JsonObject pairs -> "{\n" ++ unlines [prefix ++ show k ++ ":" ++ serialize (ident + 1) v ++ ","| (k, v) <- pairs] ++ prev_prefix ++ "}"
+    where
+        prefix = replicate (ident * 4) ' '
+        prev_prefix = replicate ((ident - 1) * 4) ' '
 
 parseFile :: FilePath -> IO (Either ParseError JsonValue)
 parseFile path = do
@@ -123,16 +132,17 @@ getNestedField :: JsonValue -> String -> Maybe JsonValue
 getNestedField (JsonObject fields) key = foldM getField (JsonObject fields) (splitOn "." key)
 getNestedField _ _ = Nothing
 
-repl :: FilePath -> IO ()
-repl path = do
-    parsedJson <- parseFile path
+repl :: Either ParseError JsonValue -> IO ()
+repl parsedJson = do
     putStr "> "
     hFlush stdout
     input <- getLine
     case parsedJson of
         Right value -> do
-            print $ getNestedField value input
-            repl path
+            case getNestedField value input of
+                Just j -> putStrLn $ serialize 1 j
+                Nothing -> putStrLn $ "field '" ++ input ++ "' does not exist"
+            repl parsedJson
         Left err -> print err
 
 
@@ -141,5 +151,11 @@ main = do
     progName <- getProgName
     args <- getArgs
     case args of
-        [path] -> repl path
+        [path] -> do
+            parsedJson <- parseFile path
+            case parsedJson of
+                Right rParsedJson -> do
+                    putStrLn $ serialize 1 rParsedJson
+                    repl parsedJson
+                Left err -> print err
         _ -> printf "ERROR: No file path was provided.\nUSAGE:\n    %s <path>\n" progName
