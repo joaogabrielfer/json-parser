@@ -108,6 +108,7 @@ jsonNumber = do
     number <- integerPart
     fraction <- option "" fractionPart
     expo <- option "" exponentPart
+    _ <- whitespace
     return $ JsonNumber $ read (sign ++ number ++ fraction ++ expo)
 
 jsonArray :: Parser JsonValue
