@@ -6,7 +6,8 @@ import Text.Parsec.String (Parser)
 import System.Environment (getArgs, getProgName)
 import GHC.IO.Handle (hFlush)
 import System.IO (stdout)
-import Data.List.Split
+import Data.Either.Combinators (mapLeft)
+import Data.Either.Utils
 import Control.Monad (foldM)
 
 whitespace :: Parser ()
@@ -17,6 +18,34 @@ lexeme p = p <* whitespace
 
 symbol :: String -> Parser String
 symbol = lexeme . string
+
+data JsonPath =
+    PathRoot String |
+    PathAcess String |
+    PathIndex Int
+    deriving(Show, Eq)
+
+jsonPath :: Parser [JsonPath]
+jsonPath = many jsonPathComponent <* eof
+
+jsonPathComponent :: Parser JsonPath
+jsonPathComponent =
+    jsonPathAcess <|>
+    jsonPathIndex <|>
+    jsonPathRoot
+
+jsonPathRoot :: Parser JsonPath
+jsonPathRoot = PathRoot <$> many1 (noneOf ".[]")
+
+jsonPathAcess :: Parser JsonPath
+jsonPathAcess = PathAcess <$> (symbol "." *> many1 (noneOf ".[]"))
+
+jsonPathIndex :: Parser JsonPath
+jsonPathIndex = PathIndex <$> read <$> (char '[' *> many1 digit <* char ']')
+
+data QueryError =
+    MalformedPathError ParseError|
+    InexsitentPathError
 
 data JsonValue =
     JsonNull |
@@ -128,9 +157,22 @@ getField (JsonObject fields) key =
 getField _ _ =
     Nothing
 
-getNestedField :: JsonValue -> String -> Maybe JsonValue
-getNestedField (JsonObject fields) key = foldM getField (JsonObject fields) (splitOn "." key)
-getNestedField _ _ = Nothing
+getArrayMember :: JsonValue -> Int -> Maybe JsonValue
+getArrayMember (JsonArray array) index =
+    pure $ array !! index
+getArrayMember _ _ =
+    Nothing
+
+resolvePathEntry :: JsonValue -> JsonPath -> Maybe JsonValue
+resolvePathEntry obj (PathRoot p) = getField obj p
+resolvePathEntry obj (PathAcess p) = getField obj p
+resolvePathEntry obj (PathIndex i) = getArrayMember obj i
+
+getNestedField :: JsonValue -> String -> Either QueryError JsonValue
+getNestedField object path = do
+    parsedPath <- mapLeft (\e -> MalformedPathError e) $ parse jsonPath "" path
+    maybeToEither InexsitentPathError (foldM resolvePathEntry object parsedPath)
+
 
 repl :: Either ParseError JsonValue -> IO ()
 repl parsedJson = do
@@ -140,8 +182,9 @@ repl parsedJson = do
     case parsedJson of
         Right value -> do
             case getNestedField value input of
-                Just j -> putStrLn $ serialize 1 j
-                Nothing -> putStrLn $ "field '" ++ input ++ "' does not exist"
+                Right j -> putStrLn $ serialize 1 j
+                Left InexsitentPathError -> putStrLn $ "field '" ++ input ++ "' does not exist"
+                Left (MalformedPathError e) -> putStrLn $ "the path '" ++ input ++ "' is not a valid one: " ++ show e
             repl parsedJson
         Left err -> print err
 

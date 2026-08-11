@@ -70,7 +70,9 @@ executable json-parser
     build-depends:
         base ^>=4.22.0.0,
         parsec,
-        split
+        split,
+        either,
+        MissingH
 
     -- Directories containing source files.
     hs-source-dirs:   app

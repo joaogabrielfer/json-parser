@@ -14,7 +14,7 @@ cabal run json-parser -- <file-path>
 where \<file-path> is the json file you want to parse.
 
 # TODOs
-- [ ] allow array querying with index notation (`foo[0]`)
+- [x] allow array querying with index notation (`foo[0]`)
 - [x] add json encoding for pretty priting
 - [ ] add support for commands instead of direct queries (`query <obj>`, `update <obj>=<value>`, etc)
 - [ ] change the command system for a robust query dsl (something sql-like)
