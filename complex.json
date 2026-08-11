@@ -1,0 +1,110 @@
+{
+  "system_environment": {
+    "datacenter_id": "dc-east-04",
+    "cluster_node": "node-compute-12B",
+    "is_production": true,
+    "last_sync_timestamp": "2026-08-11T18:45:00Z"
+  },
+  "enterprise_hierarchy": {
+    "division": {
+      "name": "Global Infrastructure",
+      "code": "DIV-GLOBAL-INFRA",
+      "department": {
+        "name": "Cloud Operations",
+        "code": "DEPT-CLOUD-OPS",
+        "team": {
+          "name": "Automation & Integration Architecture",
+          "code": "TEAM-AIA",
+          "leads": [
+            {
+              "employee_id": "EMP-00142",
+              "role": "Principal Architect",
+              "contact": {
+                "work_email": "arch.lead@enterprise.internal",
+                "emergency_pager": "+1-800-555-0199"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "ingestion_pipeline": {
+    "pipeline_id": "pipe-stream-multi-099",
+    "active_routing_rules": [
+      {
+        "rule_id": "rule-failover-01",
+        "conditions": [
+          {
+            "criteria": "error_rate_percentage",
+            "threshold": 5.5,
+            "operator": "GREATER_THAN",
+            "evaluation_window_seconds": 60
+          },
+          {
+            "criteria": "latency_ms",
+            "threshold": 450,
+            "operator": "GREATER_THAN",
+            "evaluation_window_seconds": 120
+          }
+        ],
+        "actions_on_match": {
+          "primary_action": "REDIRECT_TRAFFIC",
+          "target_endpoints": [
+            "https://us-west.internal",
+            "https://eu-central.internal"
+          ],
+          "notification_payload": {
+            "severity": "CRITICAL",
+            "channels": ["slack", "pagerduty", "email"],
+            "retry_policy": {
+              "max_attempts": 5,
+              "backoff_multiplier": 1.5,
+              "initial_delay_ms": 500
+            }
+          }
+        }
+      }
+    ],
+    "source_matrices": [
+      [
+        {
+          "matrix_cell_id": "cell-0-0",
+          "stream_weights": [0.25, 0.25, 0.50],
+          "flags": {
+            "is_encrypted": true,
+            "requires_auth": true
+          }
+        },
+        {
+          "matrix_cell_id": "cell-0-1",
+          "stream_weights": [1.0, 0.0, 0.0],
+          "flags": {
+            "is_encrypted": false,
+            "requires_auth": true
+          }
+        }
+      ],
+      [
+        {
+          "matrix_cell_id": "cell-1-0",
+          "stream_weights": [0.0, 0.50, 0.50],
+          "flags": {
+            "is_encrypted": true,
+            "requires_auth": false
+          }
+        }
+      ]
+    ]
+  },
+  "edge_case_values": {
+    "empty_array": [],
+    "empty_object": {},
+    "null_value": null,
+    "boolean_true": true,
+    "boolean_false": false,
+    "scientific_notation_positive": 6.02214076e23,
+    "scientific_notation_negative": -1.602176634e-19,
+    "large_integer": 9007199254740991
+  }
+}
