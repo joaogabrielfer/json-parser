@@ -1,6 +1,6 @@
 # json-parser
 
-Simple json parser written in haskell, using parsec, for learning purposes.
+Simple json parser written in haskell with interactive querying repl, using parsec, for learning purposes.
 
 ## Building
 ```console
