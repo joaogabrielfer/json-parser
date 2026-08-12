@@ -6,9 +6,8 @@ import Text.Parsec.String (Parser)
 import System.Environment (getArgs, getProgName)
 import GHC.IO.Handle (hFlush)
 import System.IO (stdout)
-import Data.Either.Combinators (mapLeft)
-import Data.Either.Utils
-import Control.Monad (foldM)
+import Control.Monad (foldM, join)
+import Data.List ((!?))
 
 whitespace :: Parser ()
 whitespace = skipMany (Text.Parsec.oneOf " \t\r\n")
@@ -64,6 +63,12 @@ jsonPathAcess = PathAcess <$> (symbol "." *> many1 (noneOf ".[]"))
 
 jsonPathIndex :: Parser JsonPath
 jsonPathIndex = PathIndex <$> read <$> (char '[' *> many1 digit <* char ']')
+
+renderJsonPath :: [JsonPath] -> String
+renderJsonPath = join . fmap (\case
+    PathRoot s -> s
+    PathAcess s -> '.' : s
+    PathIndex i -> "[" ++ show i ++ "]")
 
 data JsonValue =
     JsonNull |
@@ -177,10 +182,8 @@ getField _ _ =
     Nothing
 
 getArrayMember :: JsonValue -> Int -> Maybe JsonValue
-getArrayMember (JsonArray array) index =
-    pure $ array !! index
-getArrayMember _ _ =
-    Nothing
+getArrayMember (JsonArray array) index = array !? index
+getArrayMember _ _                     = Nothing
 
 resolvePathEntry :: JsonValue -> JsonPath -> Maybe JsonValue
 resolvePathEntry obj (PathRoot p) = getField obj p
@@ -194,11 +197,11 @@ printJsonPath :: JsonValue -> [JsonPath] -> IO ()
 printJsonPath value path = do
     case getNestedField value path of
         Just j -> putStrLn $ serialize 1 j
-        Nothing -> putStrLn $ "field '" ++ show path ++ "' does not exist"
+        Nothing -> putStrLn $ "field \"" ++ renderJsonPath path ++ "\" does not exist"
 
 repl :: Either ParseError JsonValue -> [JsonPath] ->  IO ()
 repl parsedJson currentPath = do
-    putStrLn $ "\nCurrent position: " ++ show currentPath
+    putStrLn $ "\nCurrent position: \"" ++ renderJsonPath currentPath ++ "\""
     putStr "> "
     hFlush stdout
     input <- getLine
@@ -209,10 +212,16 @@ repl parsedJson currentPath = do
                     printJsonPath value (currentPath ++ p)
                     repl parsedJson currentPath
                 Right (QueryCommandWalk p) -> do
-                    printJsonPath value newPath
-                    repl parsedJson newPath
-                    where
-                        newPath = currentPath ++ p
+                    let newPath = case (currentPath, p) of
+                            ([_], (PathRoot s):_) -> PathAcess s : drop 1 p
+                            _                                   -> p
+                    case getNestedField value (currentPath ++ newPath) of
+                        Just j -> do
+                            putStrLn $ serialize 1 j
+                            repl parsedJson (currentPath ++ newPath)
+                        Nothing -> do
+                            putStrLn $ "field '" ++ renderJsonPath (currentPath ++ newPath) ++ "' does not exist"
+                            repl parsedJson currentPath
                 Right (QueryCommandShow) -> do
                     printJsonPath value currentPath
                     repl parsedJson currentPath
