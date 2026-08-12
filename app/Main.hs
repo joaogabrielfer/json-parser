@@ -19,6 +19,28 @@ lexeme p = p <* whitespace
 symbol :: String -> Parser String
 symbol = lexeme . string
 
+data QueryCommand =
+    QueryCommandGet [JsonPath] |
+    QueryCommandWalk [JsonPath] |
+    QueryCommandShow
+    deriving(Show)
+
+queryCommand :: Parser QueryCommand
+queryCommand =
+    queryCommandGet <|>
+    queryCommandWalk <|>
+    queryCommandShow
+    <* eof
+
+queryCommandGet :: Parser QueryCommand
+queryCommandGet = QueryCommandGet <$> (symbol "get" *> jsonPath)
+
+queryCommandWalk :: Parser QueryCommand
+queryCommandWalk = QueryCommandWalk <$> (symbol "walk" *> jsonPath)
+
+queryCommandShow :: Parser QueryCommand
+queryCommandShow = QueryCommandShow <$ symbol "show"
+
 data JsonPath =
     PathRoot String |
     PathAcess String |
@@ -42,10 +64,6 @@ jsonPathAcess = PathAcess <$> (symbol "." *> many1 (noneOf ".[]"))
 
 jsonPathIndex :: Parser JsonPath
 jsonPathIndex = PathIndex <$> read <$> (char '[' *> many1 digit <* char ']')
-
-data QueryError =
-    MalformedPathError ParseError|
-    InexsitentPathError
 
 data JsonValue =
     JsonNull |
@@ -169,24 +187,38 @@ resolvePathEntry obj (PathRoot p) = getField obj p
 resolvePathEntry obj (PathAcess p) = getField obj p
 resolvePathEntry obj (PathIndex i) = getArrayMember obj i
 
-getNestedField :: JsonValue -> String -> Either QueryError JsonValue
-getNestedField object path = do
-    parsedPath <- mapLeft (\e -> MalformedPathError e) $ parse jsonPath "" path
-    maybeToEither InexsitentPathError (foldM resolvePathEntry object parsedPath)
+getNestedField :: JsonValue -> [JsonPath] -> Maybe JsonValue
+getNestedField object path = foldM resolvePathEntry object path
 
+printJsonPath :: JsonValue -> [JsonPath] -> IO ()
+printJsonPath value path = do
+    case getNestedField value path of
+        Just j -> putStrLn $ serialize 1 j
+        Nothing -> putStrLn $ "field '" ++ show path ++ "' does not exist"
 
-repl :: Either ParseError JsonValue -> IO ()
-repl parsedJson = do
+repl :: Either ParseError JsonValue -> [JsonPath] ->  IO ()
+repl parsedJson currentPath = do
+    putStrLn $ "\nCurrent position: " ++ show currentPath
     putStr "> "
     hFlush stdout
     input <- getLine
     case parsedJson of
         Right value -> do
-            case getNestedField value input of
-                Right j -> putStrLn $ serialize 1 j
-                Left InexsitentPathError -> putStrLn $ "field '" ++ input ++ "' does not exist"
-                Left (MalformedPathError e) -> putStrLn $ "the path '" ++ input ++ "' is not a valid one: " ++ show e
-            repl parsedJson
+            case parse queryCommand "<input>" input of
+                Right (QueryCommandGet p) -> do
+                    printJsonPath value (currentPath ++ p)
+                    repl parsedJson currentPath
+                Right (QueryCommandWalk p) -> do
+                    printJsonPath value newPath
+                    repl parsedJson newPath
+                    where
+                        newPath = currentPath ++ p
+                Right (QueryCommandShow) -> do
+                    printJsonPath value currentPath
+                    repl parsedJson currentPath
+                Left e -> do
+                    putStrLn $ "error parsing command query: \n" ++ show e
+                    repl parsedJson currentPath
         Left err -> print err
 
 
@@ -200,6 +232,6 @@ main = do
             case parsedJson of
                 Right rParsedJson -> do
                     putStrLn $ serialize 1 rParsedJson
-                    repl parsedJson
+                    repl parsedJson ([])
                 Left err -> print err
         _ -> printf "ERROR: No file path was provided.\nUSAGE:\n    %s <path>\n" progName

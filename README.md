@@ -32,6 +32,8 @@ where \<file-path> is the json file you want to parse.
 # TODOs
 - [x] allow array querying with index notation (`foo[0]`)
 - [x] add json encoding for pretty priting
-- [ ] add support for commands instead of direct queries (`query <obj>`, `update <obj>=<value>`, etc)
+- [x] manage a current position on the json
+- [x] add support for commands instead of direct queries
+- [ ] show collapsed version of json when not calling `show`
 - [ ] change the command system for a robust query dsl (something sql-like)
 - [ ] parse escaped strings in json (\n, \t, etc)
