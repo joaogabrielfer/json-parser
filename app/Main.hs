@@ -170,6 +170,15 @@ serialize ident value = case value of
         prefix = replicate (ident * 4) ' '
         prev_prefix = replicate ((ident - 1) * 4) ' '
 
+collapsedSerialize :: Bool -> JsonValue -> String
+collapsedSerialize root value = case value of
+    JsonNull -> "null"
+    JsonBool b -> if b then "true" else "false"
+    JsonString s -> "\"" ++ s ++ "\""
+    JsonNumber d -> show d
+    JsonArray _ -> if root then serialize 1 value else "[...]"
+    JsonObject pairs -> if root then "{\n" ++ unlines ["    " ++ show k ++ ":" ++ collapsedSerialize False v ++ ","| (k, v) <- pairs]  ++ "}" else "{...}"
+
 parseFile :: FilePath -> IO (Either ParseError JsonValue)
 parseFile path = do
     content <- readFile path
@@ -193,12 +202,6 @@ resolvePathEntry obj (PathIndex i) = getArrayMember obj i
 getNestedField :: JsonValue -> [JsonPath] -> Maybe JsonValue
 getNestedField object path = foldM resolvePathEntry object path
 
-printJsonPath :: JsonValue -> [JsonPath] -> IO ()
-printJsonPath value path = do
-    case getNestedField value path of
-        Just j -> putStrLn $ serialize 1 j
-        Nothing -> putStrLn $ "field \"" ++ renderJsonPath path ++ "\" does not exist"
-
 repl :: Either ParseError JsonValue -> [JsonPath] ->  IO ()
 repl parsedJson currentPath = do
     putStrLn $ "\nCurrent position: \"" ++ renderJsonPath currentPath ++ "\""
@@ -209,7 +212,9 @@ repl parsedJson currentPath = do
         Right value -> do
             case parse queryCommand "<input>" input of
                 Right (QueryCommandGet p) -> do
-                    printJsonPath value (currentPath ++ p)
+                    case getNestedField value p of
+                        Just j -> putStrLn $ collapsedSerialize True j
+                        Nothing -> putStrLn $ "field \"" ++ renderJsonPath p ++ "\" does not exist"
                     repl parsedJson currentPath
                 Right (QueryCommandWalk p) -> do
                     let newPath = case (currentPath, p) of
@@ -217,13 +222,15 @@ repl parsedJson currentPath = do
                             _                                   -> p
                     case getNestedField value (currentPath ++ newPath) of
                         Just j -> do
-                            putStrLn $ serialize 1 j
+                            putStrLn $ collapsedSerialize True j
                             repl parsedJson (currentPath ++ newPath)
                         Nothing -> do
                             putStrLn $ "field '" ++ renderJsonPath (currentPath ++ newPath) ++ "' does not exist"
                             repl parsedJson currentPath
                 Right (QueryCommandShow) -> do
-                    printJsonPath value currentPath
+                    case getNestedField value currentPath of
+                        Just j -> putStrLn $ serialize 1 j
+                        Nothing -> putStrLn $ "field \"" ++ renderJsonPath currentPath ++ "\" does not exist"
                     repl parsedJson currentPath
                 Left e -> do
                     putStrLn $ "error parsing command query: \n" ++ show e
@@ -240,7 +247,7 @@ main = do
             parsedJson <- parseFile path
             case parsedJson of
                 Right rParsedJson -> do
-                    putStrLn $ serialize 1 rParsedJson
+                    putStrLn $ collapsedSerialize True rParsedJson
                     repl parsedJson ([])
                 Left err -> print err
         _ -> printf "ERROR: No file path was provided.\nUSAGE:\n    %s <path>\n" progName

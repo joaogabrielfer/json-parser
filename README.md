@@ -34,6 +34,6 @@ where \<file-path> is the json file you want to parse.
 - [x] add json encoding for pretty priting
 - [x] manage a current position on the json
 - [x] add support for commands instead of direct queries
-- [ ] show collapsed version of json when not calling `show`
+- [x] show collapsed version of json when not calling `show`
 - [ ] change the command system for a robust query dsl (something sql-like)
 - [ ] parse escaped strings in json (\n, \t, etc)
