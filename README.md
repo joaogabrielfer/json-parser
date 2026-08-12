@@ -13,7 +13,7 @@ cabal run json-parser -- <file-path>
 ```
 where \<file-path> is the json file you want to parse.
 
-## DLS
+## DSL
 ### Commands
 - `get <object-path>` - returns the value of the path given. does not change the current position.
 - `walk <object-path>` - change the current posision to the given path.
