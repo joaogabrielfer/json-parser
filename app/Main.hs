@@ -212,9 +212,12 @@ repl parsedJson currentPath = do
         Right value -> do
             case parse queryCommand "<input>" input of
                 Right (QueryCommandGet p) -> do
-                    case getNestedField value p of
+                    let newPath = case (currentPath, p) of
+                            ([_], (PathRoot s):_) -> PathAcess s : drop 1 p
+                            _                                   -> p
+                    case getNestedField value (currentPath ++ newPath) of
                         Just j -> putStrLn $ collapsedSerialize True j
-                        Nothing -> putStrLn $ "field \"" ++ renderJsonPath p ++ "\" does not exist"
+                        Nothing -> putStrLn $ "field \"" ++ renderJsonPath newPath ++ "\" does not exist"
                     repl parsedJson currentPath
                 Right (QueryCommandWalk p) -> do
                     let newPath = case (currentPath, p) of
